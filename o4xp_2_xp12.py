@@ -28,12 +28,6 @@ import logging
 
 log = logging.getLogger("o4x_2_xp12")
 
-XP12root = "E:\\X-Plane-12"
-dsf_tool = "E:\\XPL-Tools\\xptools_win_23-4\\tools\\DSFtool"
-cmd_7zip = "c:\\Program Files\\7-Zip\\7z.exe"
-
-work_dir = "work"
-
 class Dsf():
     is_converted = False
 
@@ -66,7 +60,7 @@ class Dsf():
         if os.path.isfile(self.rdata_fn):
             self.rdata = open(self.rdata_fn, "r").readlines()
         else:
-            xp12_dsf = XP12root + "/Global Scenery/X-Plane 12 Global Scenery" + self.fname[i:]
+            xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Global Scenery" + self.fname[i:]
             xp12_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-xp12")
             #print(xp12_dsf)
             #print(xp12_dsf_txt)
@@ -113,14 +107,14 @@ class Dsf():
         return True
 
 class DsfList():
+    subset = None
+    xp12_root = None
     _lat_lon_re = None
     _o4xp_re = re.compile('zOrtho4XP_.*')
     _ao_re = re.compile('z_autoortho.scenery.z_ao_[a-z]+')
 
-    def __init__(self, xp12root):
-        self.xp12root = xp12root
+    def __init__(self):
         self.queue = Queue()
-        self.custom_scenery = os.path.normpath(os.path.join(XP12root, "Custom Scenery"))
         self._threads = []
 
     def set_rect(self, lat1, lon1, lat2, lon2):
@@ -130,7 +124,10 @@ class DsfList():
         self._lon2 = lon2
         self._lat_lon_re = re.compile('([+-]\d\d)([+-]\d\d\d).dsf')
 
-    def scan(self):
+    def scan(self, xp12_root):
+        self.xp12_root = xp12_root
+        self.custom_scenery = os.path.normpath(os.path.join(xp12_root, "Custom Scenery"))
+
         for dir, dirs, files in os.walk(self.custom_scenery):
             if not self._o4xp_re.search(dir) and  not self._ao_re.search(dir):
                 continue
@@ -138,6 +135,11 @@ class DsfList():
                 _, ext = os.path.splitext(f)
                 if ext != '.dsf':
                     continue
+
+                full_name = os.path.join(dir, f)
+                if self.subset is not None:
+                    if full_name.find(self.subset) < 0:
+                        continue
 
                 if self._lat_lon_re is not None:
                     m = self._lat_lon_re.match(f.replace('\\', '/'))
@@ -148,10 +150,12 @@ class DsfList():
                         lat > self._lat2 or lon > self._lon2):
                         continue
 
-                dsf = Dsf(os.path.join(dir, f))
+                dsf = Dsf(full_name)
                 if not dsf.is_converted:
                     self.queue.put(dsf)
                     log.info(f"queued {dsf}")
+
+        log.info(f"Queued {self.queue.qsize()} files")
 
     def worker(self, i):
          while True:
@@ -160,14 +164,14 @@ class DsfList():
             except Empty:
                 break
 
-            log.info(f"{i} -> S -> {dsf}")
+            log.info(f"Worker {i} --> {dsf}")
 
             try:
                 dsf.convert()
             except Exception as err:
                 log.warning({err})
 
-            log.info(f"{i} -> E -> {dsf}")
+            log.info(f"Worker {i} <-- {dsf}")
 
     def convert(self, num_workers):
         qlen_start = self.queue.qsize()
@@ -202,28 +206,50 @@ logging.basicConfig(level=logging.INFO,
 CFG = configparser.ConfigParser()
 CFG.read('o4xp_2_xp12.ini')
 
+xp12_root = CFG['DEFAULTS']['xp12_root']
+work_dir = CFG['DEFAULTS']['work_dir']
+num_workers = int(CFG['DEFAULTS']['num_workers'])
+
+dsf_tool = CFG['TOOLS']['dsftool']
+cmd_7zip = CFG['TOOLS']['7zip']
+dry_run = False
+
 log.info(f"args: {sys.argv}")
 
-dsf_list = DsfList(XP12root)
+dsf_list = DsfList()
+
+def usage():
+    log.error( \
+        """o4xp_2_xp12 [-rect lower_left,upper_right] [-subset string] [-dry_run] [-root xp12_root]
+            -rect       restrict to rectangle, corners format is lat,lon, e.g. +50+009
+            -subset     matching filenames must contain the string
+            -dry_run    only list matching files
+            -root       override root
+
+            Examples:
+                o4xp_2_xp12 -rect +36+019,+40+025
+                o4xp_2_xp12 -subset z_ao_eur -dry_run
+                o4xp_2_xp12 -root E:/XP12-test -subset z_ao_eur
+        """)
+    exit(1)
 
 i = 1
 while i < len(sys.argv):
     if sys.argv[i] == "-root":
         i = i + 1
         if i >= len(sys.argv):
-            log.error('No argument after "-root"')
-            exit(1)
-        XP12root = sys.argv[i]
+            usage()
+
+        xp12_root = sys.argv[i]
+
     elif sys.argv[i] == "-rect":
         i = i + 1
         if i >= len(sys.argv):
-            log.error('No argument after "-rect"')
-            exit(1)
+            usage()
 
         m = re.match("([+-]\d\d)([+-]\d\d\d),([+-]\d\d)([+-]\d\d\d)", sys.argv[i])
         if m is None:
-            log.error('invalid argument to "-rect", should be like +50+008,+51+009')
-            exit(1)
+            usage()
 
         lat1 = int(m.group(1))
         lon1 = int(m.group(2))
@@ -232,12 +258,25 @@ while i < len(sys.argv):
         log.info(f"restricting to rect ({lat1},{lon1}) -> ({lat2},{lon2})")
         dsf_list.set_rect(lat1, lon1, lat2, lon2)
 
+    elif sys.argv[i] == "-subset":
+        i = i + 1
+        if i >= len(sys.argv):
+            usage()
+
+        dsf_list.subset = sys.argv[i]
+
+    elif sys.argv[i] == "-dry_run":
+        dry_run = True
+
+    else:
+        usage()
+
     i = i + 1
 
 if not os.path.isdir(work_dir):
     os.makedirs(work_dir)
 
-dsf_list.scan()
+dsf_list.scan(xp12_root)
 #dsf_list.queue.put(Dsf("E:/X-Plane-12/Custom Scenery/z_autoortho/scenery/z_ao_eur/Earth nav data/+50+000/+51+009.dsf"))
-
-dsf_list.convert(10)
+if not dry_run:
+    dsf_list.convert(num_workers)
