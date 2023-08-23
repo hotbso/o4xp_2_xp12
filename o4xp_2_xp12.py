@@ -21,9 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import sys, os, os.path, time, shlex, subprocess
-import re
-import threading
+import sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
 import configparser
 import logging
@@ -37,12 +35,17 @@ cmd_7zip = "c:\\Program Files\\7-Zip\\7z.exe"
 work_dir = "work"
 
 class Dsf():
+    is_converted = False
+
     def __init__(self, fname):
         self.fname = fname.replace('\\', '/')
-        self.fname_bck = self.fname + "-bck"
+        self.fname_bck = self.fname + "-pre_o4xp_2_xp12"
+        self.cnv_marker = self.fname + "-o4xp_2_xp12_done"
         self.dsf_base, _ = os.path.splitext(os.path.basename(self.fname))
         self.rdata_fn = os.path.join(work_dir, self.dsf_base + ".rdata")
         self.rdata = []
+        if os.path.isfile(self.cnv_marker):
+            is_converted = True
 
     def __repr__(self):
         return f"{self.fname}"
@@ -80,17 +83,18 @@ class Dsf():
 
             os.remove(xp12_dsf_txt)
 
-        o4xp_dsf = self.fname
-        if os.path.isfile(self.fname_bck):
-            o4xp_dsf = self.fname_bck
+        # always create a backup
+        if not os.path.isfile(self.fname_bck):
+            shutil.copy2(self.fname_bck)
 
+        o4xp_dsf = self.fname_bck
         o4xp_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-o4xp")
         if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{o4xp_dsf}" "{o4xp_dsf_txt}"'):
             return False
 
         with open(o4xp_dsf_txt, 'a') as f:
             for l in self.rdata:
-                if (l.find("spr") > 0 or l.find("sum") > 0 or l.find("win") > 0 # make a positive list
+                if (l.find("spr") > 0 or l.find("sum") > 0 or l.find("win") > 0 # use a positive list
                    or l.find("fal") > 0 or l.find("soundscape") > 0 or l.find("elevation") > 0):
                     f.write(l)
 
@@ -103,6 +107,9 @@ class Dsf():
             return False
 
         os.remove(fname_new_1)
+        os.remove(self.fname)
+        os.rename(fname_new, self.fname)
+        open(self.cnv_marker, "w")  # create the marker
         return True
 
 class DsfList():
@@ -123,7 +130,9 @@ class DsfList():
                 _, ext = os.path.splitext(f)
                 if ext != '.dsf':
                     continue
-                self.queue.put(Dsf(os.path.join(dir, f)))
+                dsf = Dsf(os.path.join(dir, f))
+                if not dsf.is_converted:
+                    self.queue.put()
 
     def worker(self, i):
          while True:
