@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import sys, os, os.path, shlex, subprocess
+import sys, os, os.path, time, shlex, subprocess
 import re
 import threading
 from queue import Queue, Empty
@@ -47,9 +47,19 @@ class Dsf():
     def __repr__(self):
         return f"{self.fname}"
 
+    def run_cmd(self, cmd):
+        out = subprocess.run(shlex.split(cmd), capture_output = True, shell = True)
+        if out.returncode != 0:
+            log.error(f"Can't run {cmd}: {out}")
+            return False
+
+        return True
+
     def convert(self):
         i = self.fname.find("/Earth nav data/")
         assert i > 0, "invalid filename"
+
+        # check for already extracted raster data
         if os.path.isfile(self.rdata_fn):
             self.rdata = open(self.rdata_fn, "r").readlines()
         else:
@@ -57,9 +67,7 @@ class Dsf():
             xp12_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-xp12")
             #print(xp12_dsf)
             #print(xp12_dsf_txt)
-            out = subprocess.run(shlex.split(f'"{dsf_tool}" -dsf2text "{xp12_dsf}" "{xp12_dsf_txt}"'), shell = True)
-            if out.returncode != 0:
-                log.error(f"Can't run {dsf_tool}: {out}")
+            if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{xp12_dsf}" "{xp12_dsf_txt}"'):
                 return False
 
             with open(self.rdata_fn, "w") as frd:
@@ -77,9 +85,7 @@ class Dsf():
             o4xp_dsf = self.fname_bck
 
         o4xp_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-o4xp")
-        out = subprocess.run(shlex.split(f'"{dsf_tool}" -dsf2text "{o4xp_dsf}" "{o4xp_dsf_txt}"'), shell = True)
-        if out.returncode != 0:
-            log.error(f"Can't run {dsf_tool}: {out}")
+        if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{o4xp_dsf}" "{o4xp_dsf_txt}"'):
             return False
 
         with open(o4xp_dsf_txt, 'a') as f:
@@ -90,15 +96,10 @@ class Dsf():
 
         fname_new = self.fname + "-new"
         fname_new_1 = fname_new + "-1"
-        out = subprocess.run(shlex.split(f'"{dsf_tool}" -text2dsf "{o4xp_dsf_txt}" "{fname_new_1}"'), shell = True)
-        if out.returncode != 0:
-            log.error(f"Can't run {dsf_tool}: {out}")
+        if not self.run_cmd(f'"{dsf_tool}" -text2dsf "{o4xp_dsf_txt}" "{fname_new_1}"'):
             return False
 
-        cmd = shlex.split(f'"{cmd_7zip}" a -t7z -m0=lzma "{fname_new}" "{fname_new_1}"')
-        out = subprocess.run(cmd, shell = True)
-        if out.returncode != 0:
-            log.error(f"Can't run {cmd}: {out}")
+        if not self.run_cmd(f'"{cmd_7zip}" a -t7z -m0=lzma "{fname_new}" "{fname_new_1}"'):
             return False
 
         os.remove(fname_new_1)
@@ -112,6 +113,7 @@ class DsfList():
         self.xp12root = xp12root
         self.queue = Queue()
         self.custom_scenery = os.path.normpath(os.path.join(XP12root, "Custom Scenery"))
+        self._threads = []
 
     def scan(self):
         for dir, dirs, files in os.walk(self.custom_scenery):
@@ -130,22 +132,31 @@ class DsfList():
             except Empty:
                 break
 
-            print(f"{i} -> S -> {dsf}")
+            log.info(f"{i} -> S -> {dsf}")
 
             try:
                 dsf.convert()
             except:
                 pass
 
-            print(f"{i} -> E -> {dsf}")
-            self.queue.task_done()
+            log.info(f"{i} -> E -> {dsf}")
 
     def convert(self, num_workers):
         for i in range(num_workers):
             t = threading.Thread(target=self.worker, args=(i,), daemon = True)
+            self._threads.append(t)
             t.start()
 
-        self.queue.join()
+        qlen_start = self.queue.qsize()
+        while True:
+            time.sleep(20)
+            qlen = self.queue.qsize()
+            if qlen == 0:
+                break
+            log.info(f"{qlen}/{qlen_start} = {(qlen/qlen_start):0.2f} processed")
+
+        for t in self._threads:
+            t.join()
 
 ###########
 ## main
