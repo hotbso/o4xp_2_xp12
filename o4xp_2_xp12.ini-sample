@@ -1,0 +1,7 @@
+[DEFAULTS]
+xp12_root = E:\X-Plane-12
+num_workers = 10
+work_dir = work
+[TOOLS]
+dsftool = E:\XPL-Tools\xptools_win_23-4\tools\DSFtool
+7zip = c:\Program Files\7-Zip\7z.exe
