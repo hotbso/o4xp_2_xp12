@@ -97,6 +97,8 @@ class Dsf():
         if not self.run_cmd(f'"{dsf_tool}" -text2dsf "{o4xp_dsf_txt}" "{fname_new_1}"'):
             return False
 
+        os.remove(o4xp_dsf_txt)
+
         if not self.run_cmd(f'"{cmd_7zip}" a -t7z -m0=lzma "{fname_new}" "{fname_new_1}"'):
             return False
 
