@@ -21,6 +21,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+VERSION = "1.0-b2"
+
 import sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
 import configparser
@@ -204,7 +206,7 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler(filename = "o4x_2_xp12.log", mode='w'),
                               logging.StreamHandler()])
 
-#log.info(f"Version: {version}")
+log.info(f"Version: {VERSION}")
 CFG = configparser.ConfigParser()
 CFG.read('o4xp_2_xp12.ini')
 
