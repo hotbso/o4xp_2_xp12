@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+o4xp_2_xp12.ini
+o4xp_2_xp12*.zip
 
 # C extensions
 *.so
