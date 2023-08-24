@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.0-b2"
+VERSION = "1.0-b3"
 
 import sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
@@ -47,7 +47,8 @@ class Dsf():
         return f"{self.fname}"
 
     def run_cmd(self, cmd):
-        out = subprocess.run(shlex.split(cmd), capture_output = True, shell = True)
+        # "shell = True" is not needed on Windows, bombs on Lx
+        out = subprocess.run(shlex.split(cmd), capture_output = True)
         if out.returncode != 0:
             log.error(f"Can't run {cmd}: {out}")
             return False
