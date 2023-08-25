@@ -31,7 +31,6 @@ import logging
 log = logging.getLogger("o4x_2_xp12")
 
 class Dsf():
-    is_converted = False
 
     def __init__(self, fname):
         self.fname = fname.replace('\\', '/')
@@ -40,8 +39,8 @@ class Dsf():
         self.dsf_base, _ = os.path.splitext(os.path.basename(self.fname))
         self.rdata_fn = os.path.join(work_dir, self.dsf_base + ".rdata")
         self.rdata = []
-        if os.path.isfile(self.cnv_marker):
-            self.is_converted = True
+        self.is_converted = os.path.isfile(self.cnv_marker)
+        self.has_backup = os.path.isfile(self.fname_bck)
 
     def __repr__(self):
         return f"{self.fname}"
@@ -112,6 +111,12 @@ class Dsf():
         return True
 
 class DsfList():
+    # modes
+    M_CONVERT = 0
+    M_REDO = 1
+    M_UNDO = 2
+    M_CLEANUP = 3
+
     subset = None
     xp12_root = None
     _lat_lon_re = None
@@ -129,7 +134,7 @@ class DsfList():
         self._lon2 = lon2
         self._lat_lon_re = re.compile('([+-]\d\d)([+-]\d\d\d).dsf')
 
-    def scan(self, xp12_root):
+    def scan(self, xp12_root, mode):
         self.xp12_root = xp12_root
         self.custom_scenery = os.path.normpath(os.path.join(xp12_root, "Custom Scenery"))
 
@@ -156,9 +161,16 @@ class DsfList():
                         continue
 
                 dsf = Dsf(full_name)
-                if not dsf.is_converted:
+                if mode == self.M_CONVERT and not dsf.is_converted:
                     self.queue.put(dsf)
                     log.info(f"queued {dsf}")
+                elif mode == self.M_REDO and dsf.is_converted:
+                    if dsf.has_backup:
+                        self.queue.put(dsf)
+                        log.info(f"queued {dsf}")
+                    else:
+                        log.warning(f"{dsf} has no backup")
+
 
         log.info(f"Queued {self.queue.qsize()} files")
 
@@ -238,6 +250,8 @@ def usage():
         """)
     exit(1)
 
+mode = DsfList.M_CONVERT
+
 i = 1
 while i < len(sys.argv):
     if sys.argv[i] == "-root":
@@ -273,6 +287,11 @@ while i < len(sys.argv):
     elif sys.argv[i] == "-dry_run":
         dry_run = True
 
+    elif sys.argv[i] == "-redo":
+        if mode != DsfList.M_CONVERT:
+            usage()
+        mode = DsfList.M_REDO
+
     else:
         usage()
 
@@ -281,7 +300,7 @@ while i < len(sys.argv):
 if not os.path.isdir(work_dir):
     os.makedirs(work_dir)
 
-dsf_list.scan(xp12_root)
+dsf_list.scan(xp12_root, mode)
 #dsf_list.queue.put(Dsf("E:/X-Plane-12/Custom Scenery/z_autoortho/scenery/z_ao_eur/Earth nav data/+50+000/+51+009.dsf"))
-if not dry_run:
+if not dry_run and (mode == DsfList.M_CONVERT or DsfList.M_REDO):
     dsf_list.convert(num_workers)
