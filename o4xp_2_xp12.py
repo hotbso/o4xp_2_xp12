@@ -110,6 +110,17 @@ class Dsf():
         open(self.cnv_marker, "w")  # create the marker
         return True
 
+    def undo(self):
+        os.remove(self.fname)
+        os.rename(self.fname_bck, self.fname)
+        try:
+            os.remove(self.cnv_marker)
+        except:
+            pass
+
+    def cleanup(self):
+        os.remove(self.fname_bck)
+
 class DsfList():
     # modes
     M_CONVERT = 0
@@ -164,6 +175,7 @@ class DsfList():
                 if mode == self.M_CONVERT and not dsf.is_converted:
                     self.queue.put(dsf)
                     log.info(f"queued {dsf}")
+
                 elif mode == self.M_REDO and dsf.is_converted:
                     if dsf.has_backup:
                         self.queue.put(dsf)
@@ -171,10 +183,21 @@ class DsfList():
                     else:
                         log.warning(f"{dsf} has no backup")
 
+                elif mode == self.M_UNDO:
+                    if dsf.has_backup:
+                        self.queue.put(dsf)
+                        log.info(f"queued {dsf}")
+                    elif dsf.is_converted:
+                        log.warning(f"{dsf} has no backup, can't undo")
+
+                elif mode == self.M_CLEANUP:
+                    if dsf.has_backup and dsf.is_converted:
+                        self.queue.put(dsf)
+                        log.info(f"queued {dsf}")
 
         log.info(f"Queued {self.queue.qsize()} files")
 
-    def worker(self, i):
+    def worker(self, i, mode):
          while True:
             try:
                 dsf = self.queue.get(block = False, timeout = 5)    # timeout to make it interruptible
@@ -184,18 +207,26 @@ class DsfList():
             log.info(f"Worker {i} --> {dsf}")
 
             try:
-                dsf.convert()
+                if mode == DsfList.M_CONVERT or mode == DsfList.M_REDO:
+                    dsf.convert()
+                elif mode == DsfList.M_UNDO:
+                    dsf.undo()
+                elif mode == DsfList.M_CLEANUP:
+                    dsf.cleanup()
+                else:
+                    assert False
+
             except Exception as err:
                 log.warning({err})
 
             log.info(f"Worker {i} <-- {dsf}")
 
-    def convert(self, num_workers):
+    def execute(self, num_workers, mode):
         qlen_start = self.queue.qsize()
         start_time = time.time()
 
         for i in range(num_workers):
-            t = threading.Thread(target=self.worker, args=(i,), daemon = True)
+            t = threading.Thread(target=self.worker, args=(i, mode), daemon = True)
             self._threads.append(t)
             t.start()
 
@@ -243,13 +274,22 @@ def usage():
             -dry_run    only list matching files
             -root       override root
 
+            -redo       redo conversions
+            -undo       undo conversions
+            -cleanup    remove backup files
+
+            -redo, -undo, -cleanup are mutually exclusive
+
             Examples:
                 o4xp_2_xp12 -rect +36+019,+40+025
                 o4xp_2_xp12 -subset z_ao_eur -dry_run
                 o4xp_2_xp12 -root E:/XP12-test -subset z_ao_eur
+                o4xp_2_xp12 -rect +36+019,+40+025 -cleanup
         """)
     exit(1)
 
+
+mode = None
 mode = DsfList.M_CONVERT
 
 i = 1
@@ -292,6 +332,16 @@ while i < len(sys.argv):
             usage()
         mode = DsfList.M_REDO
 
+    elif sys.argv[i] == "-undo":
+        if mode != DsfList.M_CONVERT:
+            usage()
+        mode = DsfList.M_UNDO
+
+    elif sys.argv[i] == "-cleanup":
+        if mode != DsfList.M_CONVERT:
+            usage()
+        mode = DsfList.M_CLEANUP
+
     else:
         usage()
 
@@ -302,5 +352,5 @@ if not os.path.isdir(work_dir):
 
 dsf_list.scan(xp12_root, mode)
 #dsf_list.queue.put(Dsf("E:/X-Plane-12/Custom Scenery/z_autoortho/scenery/z_ao_eur/Earth nav data/+50+000/+51+009.dsf"))
-if not dry_run and (mode == DsfList.M_CONVERT or DsfList.M_REDO):
-    dsf_list.convert(num_workers)
+if not dry_run:
+    dsf_list.execute(num_workers, mode)
