@@ -145,55 +145,65 @@ class DsfList():
         self._lon2 = lon2
         self._lat_lon_re = re.compile('([+-]\d\d)([+-]\d\d\d).dsf')
 
-    def scan(self, xp12_root, mode):
+    def scan(self, xp12_root, mode, limit):
         self.xp12_root = xp12_root
         self.custom_scenery = os.path.normpath(os.path.join(xp12_root, "Custom Scenery"))
 
-        for dir, dirs, files in os.walk(self.custom_scenery):
-            if not self._o4xp_re.search(dir) and  not self._ao_re.search(dir):
-                continue
-            for f in files:
-                _, ext = os.path.splitext(f)
-                if ext != '.dsf':
+        try:
+            for dir, dirs, files in os.walk(self.custom_scenery):
+                if not self._o4xp_re.search(dir) and  not self._ao_re.search(dir):
                     continue
+                for f in files:
+                    if limit <= 0:
+                        raise StopIteration     # break out of all loops
 
-                full_name = os.path.join(dir, f)
-                if self.subset is not None:
-                    if full_name.find(self.subset) < 0:
+                    _, ext = os.path.splitext(f)
+                    if ext != '.dsf':
                         continue
 
-                if self._lat_lon_re is not None:
-                    m = self._lat_lon_re.match(f.replace('\\', '/'))
-                    assert m is not None
-                    lat = int(m.group(1))
-                    lon = int(m.group(2))
-                    if (lat < self._lat1 or lon < self._lon1 or
-                        lat > self._lat2 or lon > self._lon2):
-                        continue
+                    full_name = os.path.join(dir, f)
+                    if self.subset is not None:
+                        if full_name.find(self.subset) < 0:
+                            continue
 
-                dsf = Dsf(full_name)
-                if mode == self.M_CONVERT and not dsf.is_converted:
-                    self.queue.put(dsf)
-                    log.info(f"queued {dsf}")
+                    if self._lat_lon_re is not None:
+                        m = self._lat_lon_re.match(f.replace('\\', '/'))
+                        assert m is not None
+                        lat = int(m.group(1))
+                        lon = int(m.group(2))
+                        if (lat < self._lat1 or lon < self._lon1 or
+                            lat > self._lat2 or lon > self._lon2):
+                            continue
 
-                elif mode == self.M_REDO and dsf.is_converted:
-                    if dsf.has_backup:
+                    dsf = Dsf(full_name)
+                    if mode == self.M_CONVERT and not dsf.is_converted:
                         self.queue.put(dsf)
+                        limit = limit - 1
                         log.info(f"queued {dsf}")
-                    else:
-                        log.warning(f"{dsf} has no backup")
 
-                elif mode == self.M_UNDO:
-                    if dsf.has_backup:
-                        self.queue.put(dsf)
-                        log.info(f"queued {dsf}")
-                    elif dsf.is_converted:
-                        log.warning(f"{dsf} has no backup, can't undo")
+                    elif mode == self.M_REDO and dsf.is_converted:
+                        if dsf.has_backup:
+                            self.queue.put(dsf)
+                            log.info(f"queued {dsf}")
+                            limit = limit - 1
+                        else:
+                            log.warning(f"{dsf} has no backup")
 
-                elif mode == self.M_CLEANUP:
-                    if dsf.has_backup and dsf.is_converted:
-                        self.queue.put(dsf)
-                        log.info(f"queued {dsf}")
+                    elif mode == self.M_UNDO:
+                        if dsf.has_backup:
+                            self.queue.put(dsf)
+                            log.info(f"queued {dsf}")
+                            limit = limit - 1
+                        elif dsf.is_converted:
+                            log.warning(f"{dsf} has no backup, can't undo")
+
+                    elif mode == self.M_CLEANUP:
+                        if dsf.has_backup and dsf.is_converted:
+                            self.queue.put(dsf)
+                            limit = limit - 1
+                            log.info(f"queued {dsf}")
+        except StopIteration:
+            pass
 
         log.info(f"Queued {self.queue.qsize()} files")
 
@@ -268,29 +278,31 @@ dsf_list = DsfList()
 
 def usage():
     log.error( \
-        """o4xp_2_xp12 [-rect lower_left,upper_right] [-subset string] [-dry_run] [-root xp12_root]
+        """o4xp_2_xp12 [-rect lower_left,upper_right] [-subset string] [-limit n] [-dry_run] [-root xp12_root] convert|redo|undo|cleanup
             -rect       restrict to rectangle, corners format is lat,lon, e.g. +50+009
             -subset     matching filenames must contain the string
             -dry_run    only list matching files
             -root       override root
+            -limit n    limit operation to n dsf files
 
-            -redo       redo conversions
-            -undo       undo conversions
-            -cleanup    remove backup files
+            convert     you guessed it
+            redo        redo conversions
+            undo        undo conversions
+            cleanup     remove backup files
 
-            -redo, -undo, -cleanup are mutually exclusive
+            convert, redo, undo, cleanup are mutually exclusive
 
             Examples:
-                o4xp_2_xp12 -rect +36+019,+40+025
-                o4xp_2_xp12 -subset z_ao_eur -dry_run
-                o4xp_2_xp12 -root E:/XP12-test -subset z_ao_eur
+                o4xp_2_xp12 -rect +36+019,+40+025 convert
+                o4xp_2_xp12 -subset z_ao_eur -dry_run cleanup
+                o4xp_2_xp12 -root E:/XP12-test -subset z_ao_eur -limit 1000 convert
                 o4xp_2_xp12 -rect +36+019,+40+025 -cleanup
         """)
     exit(1)
 
 
 mode = None
-mode = DsfList.M_CONVERT
+limit = 10000000
 
 i = 1
 while i < len(sys.argv):
@@ -324,21 +336,35 @@ while i < len(sys.argv):
 
         dsf_list.subset = sys.argv[i]
 
+    elif sys.argv[i] == "-limit":
+        i = i + 1
+        if i >= len(sys.argv):
+            usage()
+
+        limit = int(sys.argv[i])
+        if limit <= 0:
+            usage()
+
     elif sys.argv[i] == "-dry_run":
         dry_run = True
 
-    elif sys.argv[i] == "-redo":
-        if mode != DsfList.M_CONVERT:
+    elif sys.argv[i] == "convert":
+        if mode is not None:
+            usage()
+        mode = DsfList.M_CONVERT
+
+    elif sys.argv[i] == "redo":
+        if mode is not None:
             usage()
         mode = DsfList.M_REDO
 
-    elif sys.argv[i] == "-undo":
-        if mode != DsfList.M_CONVERT:
+    elif sys.argv[i] == "undo":
+        if mode is not None:
             usage()
         mode = DsfList.M_UNDO
 
-    elif sys.argv[i] == "-cleanup":
-        if mode != DsfList.M_CONVERT:
+    elif sys.argv[i] == "cleanup":
+        if mode is not None:
             usage()
         mode = DsfList.M_CLEANUP
 
@@ -347,10 +373,13 @@ while i < len(sys.argv):
 
     i = i + 1
 
+if mode is None:
+    usage()
+
 if not os.path.isdir(work_dir):
     os.makedirs(work_dir)
 
-dsf_list.scan(xp12_root, mode)
+dsf_list.scan(xp12_root, mode, limit)
 #dsf_list.queue.put(Dsf("E:/X-Plane-12/Custom Scenery/z_autoortho/scenery/z_ao_eur/Earth nav data/+50+000/+51+009.dsf"))
 if not dry_run:
     dsf_list.execute(num_workers, mode)
