@@ -1,11 +1,15 @@
-all: o4xp_2_xp12/o4xp_2_xp12.py o4xp_2_xp12/o4xp_2_xp12.exe
+all: o4xp_2_xp12/o4xp_2_xp12.py o4xp_2_xp12/o4xp_2_xp12.exe o4xp_2_xp12/o4xp_2_xp12.ini-sample
 
 OBJDIR=./OBJ
 
 o4xp_2_xp12/o4xp_2_xp12.exe: o4xp_2_xp12.py   
 	python -m PyInstaller  --distpath o4xp_2_xp12/. --workpath $(OBJDIR) --onefile o4xp_2_xp12.py
 
-o4xp_2_xp12/o4xp_2_xp12.py: o4xp_2_xp12.py
+o4xp_2_xp12/o4xp_2_xp12.py: o4xp_2_xp12.py o4xp_2_xp12.ini-sample
 	mkdir -p $(OBJDIR)
 	mkdir -p o4xp_2_xp12
-	cp -p $< $@
+	cp -p $< o4xp_2_xp12/.
+
+o4xp_2_xp12/o4xp_2_xp12.ini-sample: o4xp_2_xp12.ini-sample
+	mkdir -p o4xp_2_xp12
+	cp -p $< o4xp_2_xp12/.
