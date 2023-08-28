@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.0-b3"
+VERSION = "1.0-b4"
 
 import sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
@@ -62,7 +62,11 @@ class Dsf():
         if os.path.isfile(self.rdata_fn):
             self.rdata = open(self.rdata_fn, "r").readlines()
         else:
-            xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Global Scenery" + self.fname[i:]
+            # demo areas overlay global scenery
+            xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Demo Areas" + self.fname[i:]
+            if not os.path.isfile(xp12_dsf):
+                xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Global Scenery" + self.fname[i:]
+
             xp12_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-xp12")
             #print(xp12_dsf)
             #print(xp12_dsf_txt)
