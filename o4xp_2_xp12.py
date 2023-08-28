@@ -28,7 +28,7 @@ from queue import Queue, Empty
 import configparser
 import logging
 
-log = logging.getLogger("o4x_2_xp12")
+log = logging.getLogger("o4xp_2_xp12")
 
 class Dsf():
 
