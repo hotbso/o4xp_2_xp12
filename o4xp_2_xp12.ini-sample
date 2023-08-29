@@ -1,7 +1,9 @@
 [DEFAULTS]
 xp12_root = E:\X-Plane-12
-num_workers = 10
+# below is the default. If you have your orthos elsewhere specify it here
+ortho_dir = %(xp12_root)s\Custom Scenery
 work_dir = work
+num_workers = 10
 [TOOLS]
 dsftool = E:\XPL-Tools\xptools_win_23-4\tools\DSFtool
 7zip = c:\Program Files\7-Zip\7z.exe

@@ -132,15 +132,14 @@ class DsfList():
     M_UNDO = 2
     M_CLEANUP = 3
 
-    subset = None
-    xp12_root = None
-    _lat_lon_re = None
     _o4xp_re = re.compile('zOrtho4XP_.*')
     _ao_re = re.compile('z_autoortho.scenery.z_ao_[a-z]+')
 
-    def __init__(self):
+    def __init__(self, xp12_root, ortho_dir):
         self.queue = Queue()
         self._threads = []
+        self.xp12_root = xp12_root
+        self.ortho_dir = os.path.normpath(ortho_dir)
 
     def set_rect(self, lat1, lon1, lat2, lon2):
         self._lat1 = lat1
@@ -149,12 +148,14 @@ class DsfList():
         self._lon2 = lon2
         self._lat_lon_re = re.compile('([+-]\d\d)([+-]\d\d\d).dsf')
 
-    def scan(self, xp12_root, mode, limit):
-        self.xp12_root = xp12_root
-        self.custom_scenery = os.path.normpath(os.path.join(xp12_root, "Custom Scenery"))
+    def scan(self, mode, limit, subset, rect):
+        lat_lon_re = None
+        if rect is not None:
+            lat1, lon1, lat2, lon2 = rect
+            lat_lon_re = re.compile('([+-]\d\d)([+-]\d\d\d).dsf')
 
-        try:
-            for dir, dirs, files in os.walk(self.custom_scenery):
+        try:    # until StopIteration
+            for dir, dirs, files in os.walk(self.ortho_dir):
                 if not self._o4xp_re.search(dir) and  not self._ao_re.search(dir):
                     continue
                 for f in files:
@@ -166,17 +167,17 @@ class DsfList():
                         continue
 
                     full_name = os.path.join(dir, f)
-                    if self.subset is not None:
-                        if full_name.find(self.subset) < 0:
+                    if subset is not None:
+                        if full_name.find(subset) < 0:
                             continue
 
-                    if self._lat_lon_re is not None:
-                        m = self._lat_lon_re.match(f.replace('\\', '/'))
+                    if lat_lon_re is not None:
+                        m = lat_lon_re.match(f.replace('\\', '/'))
                         assert m is not None
                         lat = int(m.group(1))
                         lon = int(m.group(2))
-                        if (lat < self._lat1 or lon < self._lon1 or
-                            lat > self._lat2 or lon > self._lon2):
+                        if (lat < lat1 or lon < lon1 or
+                            lat > lat2 or lon > lon2):
                             continue
 
                     dsf = Dsf(full_name)
@@ -265,24 +266,15 @@ logging.basicConfig(level=logging.INFO,
                               logging.StreamHandler()])
 
 log.info(f"Version: {VERSION}")
-CFG = configparser.ConfigParser()
-CFG.read('o4xp_2_xp12.ini')
-
-xp12_root = CFG['DEFAULTS']['xp12_root']
-work_dir = CFG['DEFAULTS']['work_dir']
-num_workers = int(CFG['DEFAULTS']['num_workers'])
-
-dsf_tool = CFG['TOOLS']['dsftool']
-cmd_7zip = CFG['TOOLS']['7zip']
-dry_run = False
-
 log.info(f"args: {sys.argv}")
 
-dsf_list = DsfList()
+CFG = configparser.ConfigParser()
+CFG.read('o4xp_2_xp12.ini')
+dry_run = False
 
 def usage():
     log.error( \
-        """o4xp_2_xp12 [-rect lower_left,upper_right] [-subset string] [-limit n] [-dry_run] [-root xp12_root] convert|redo|undo|cleanup
+        """o4xp_2_xp12 [-rect lower_left,upper_right] [-subset string] [-limit n] [-dry_run] [-root xp12_root] convert|undo|cleanup
             -rect       restrict to rectangle, corners format is lat,lon, e.g. +50+009
             -subset     matching filenames must contain the string
             -dry_run    only list matching files
@@ -290,11 +282,10 @@ def usage():
             -limit n    limit operation to n dsf files
 
             convert     you guessed it
-            redo        redo conversions
             undo        undo conversions
             cleanup     remove backup files
 
-            convert, redo, undo, cleanup are mutually exclusive
+            convert, undo, cleanup are mutually exclusive
 
             Examples:
                 o4xp_2_xp12 -rect +36+019,+40+025 convert
@@ -306,6 +297,9 @@ def usage():
 
 
 mode = None
+subset = None
+rect = None
+
 limit = 10000000
 
 i = 1
@@ -316,6 +310,7 @@ while i < len(sys.argv):
             usage()
 
         xp12_root = sys.argv[i]
+        CFG['DEFAULTS']['xp12_root'] = xp12_root
 
     elif sys.argv[i] == "-rect":
         i = i + 1
@@ -331,14 +326,14 @@ while i < len(sys.argv):
         lat2 = int(m.group(3))
         lon2 = int(m.group(4))
         log.info(f"restricting to rect ({lat1},{lon1}) -> ({lat2},{lon2})")
-        dsf_list.set_rect(lat1, lon1, lat2, lon2)
+        rect = (lat1, lon1, lat2, lon2)
 
     elif sys.argv[i] == "-subset":
         i = i + 1
         if i >= len(sys.argv):
             usage()
 
-        dsf_list.subset = sys.argv[i]
+        subset = sys.argv[i]
 
     elif sys.argv[i] == "-limit":
         i = i + 1
@@ -380,10 +375,23 @@ while i < len(sys.argv):
 if mode is None:
     usage()
 
+xp12_root = CFG['DEFAULTS']['xp12_root']
+work_dir = CFG['DEFAULTS']['work_dir']
+ortho_dir = CFG['DEFAULTS']['ortho_dir']
+num_workers = int(CFG['DEFAULTS']['num_workers'])
+dsf_tool = CFG['TOOLS']['dsftool']
+cmd_7zip = CFG['TOOLS']['7zip']
+
+log.info(f"xp12_root: {xp12_root}")
+log.info(f"ortho_dir: {ortho_dir}")
+
+dsf_list = DsfList(xp12_root, ortho_dir)
+
 if not os.path.isdir(work_dir):
     os.makedirs(work_dir)
 
-dsf_list.scan(xp12_root, mode, limit)
+dsf_list.scan(mode, limit, subset, rect)
+
 #dsf_list.queue.put(Dsf("E:/X-Plane-12/Custom Scenery/z_autoortho/scenery/z_ao_eur/Earth nav data/+50+000/+51+009.dsf"))
 if not dry_run:
     dsf_list.execute(num_workers, mode)
