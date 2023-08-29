@@ -141,13 +141,6 @@ class DsfList():
         self.xp12_root = xp12_root
         self.ortho_dir = os.path.normpath(ortho_dir)
 
-    def set_rect(self, lat1, lon1, lat2, lon2):
-        self._lat1 = lat1
-        self._lon1 = lon1
-        self._lat2 = lat2
-        self._lon2 = lon2
-        self._lat_lon_re = re.compile('([+-]\d\d)([+-]\d\d\d).dsf')
-
     def scan(self, mode, limit, subset, rect):
         lat_lon_re = None
         if rect is not None:
