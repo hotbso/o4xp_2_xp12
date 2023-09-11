@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.0-b4"
+VERSION = "1.0-b5"
 
 import sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
@@ -83,13 +83,15 @@ class Dsf():
 
             os.remove(xp12_dsf_txt)
 
-        # always create a backup
-        if not os.path.isfile(self.fname_bck):
-            shutil.copy2(self.fname, self.fname_bck)
 
-        o4xp_dsf = self.fname_bck
         o4xp_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-o4xp")
-        if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{o4xp_dsf}" "{o4xp_dsf_txt}"'):
+        if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{self.fname}" "{o4xp_dsf_txt}"'):
+            return False
+
+        o4xp_dsf_txt_lines = open(o4xp_dsf_txt, "r").readlines()
+        if any("RASTER" in l for l in o4xp_dsf_txt_lines):
+            log.warning(f"{self.fname} contains RASTER data, skipped")
+            os.remove(o4xp_dsf_txt)
             return False
 
         with open(o4xp_dsf_txt, 'a') as f:
@@ -97,6 +99,10 @@ class Dsf():
                 if (l.find("spr") > 0 or l.find("sum") > 0 or l.find("win") > 0 # use a positive list
                    or l.find("fal") > 0 or l.find("soundscape") > 0 or l.find("elevation") > 0):
                     f.write(l)
+
+        # always create a backup
+        if not os.path.isfile(self.fname_bck):
+            shutil.copy2(self.fname, self.fname_bck)
 
         fname_new = self.fname + "-new"
         fname_new_1 = fname_new + "-1"
@@ -134,6 +140,7 @@ class DsfList():
 
     _o4xp_re = re.compile('zOrtho4XP_.*')
     _ao_re = re.compile('z_autoortho.scenery.z_ao_[a-z]+')
+    _orbx_te_re = re.compile('Orbx_.*_TE_Orthos')
 
     def __init__(self, xp12_root, ortho_dir):
         self.queue = Queue()
@@ -149,8 +156,10 @@ class DsfList():
 
         try:    # until StopIteration
             for dir, dirs, files in os.walk(self.ortho_dir):
-                if not self._o4xp_re.search(dir) and  not self._ao_re.search(dir):
+                if not self._o4xp_re.search(dir) and not self._ao_re.search(dir) \
+                        and not self._orbx_te_re.search(dir):
                     continue
+
                 for f in files:
                     if limit <= 0:
                         raise StopIteration     # break out of all loops
