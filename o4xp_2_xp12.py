@@ -295,7 +295,7 @@ def usage():
                 o4xp_2_xp12 -root E:/XP12-test -subset z_ao_eur -limit 1000 convert
                 o4xp_2_xp12 -rect +36+019,+40+025 -cleanup
         """)
-    exit(1)
+    sys.exit(2)
 
 
 mode = None
