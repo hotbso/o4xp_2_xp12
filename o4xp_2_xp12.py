@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.0-b5"
+VERSION = "1.0"
 
 import sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
