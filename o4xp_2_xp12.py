@@ -21,9 +21,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.0"
+VERSION = "1.1"
 
-import sys, os, os.path, time, shlex, subprocess, shutil, re, threading
+import platform, sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
 import configparser
 import logging
@@ -297,6 +297,33 @@ def usage():
         """)
     sys.exit(2)
 
+xp12_root = CFG['DEFAULTS']['xp12_root']
+work_dir = CFG['DEFAULTS']['work_dir']
+ortho_dir = CFG['DEFAULTS']['ortho_dir']
+num_workers = int(CFG['DEFAULTS']['num_workers'])
+dsf_tool = CFG['TOOLS']['dsftool']
+cmd_7zip = CFG['TOOLS']['7zip']
+
+sanity_checks = True
+if not os.path.isdir(xp12_root):
+    sanity_checks = False
+    log.error(f"xp12_root: '{xp12_root}' is not a valid directory")
+
+if not os.path.isdir(ortho_dir):
+    sanity_checks = False
+    log.error(f"ortho_dir: '{ortho_dir}' is not a valid directory")
+
+if not os.path.isfile(dsf_tool):
+    sanity_checks = False
+    log.error(f"dsf_tool: '{dsf_tool}' is not pointing to a file")
+
+if platform.system() == 'Windows':
+    if not os.path.isfile(cmd_7zip):
+        sanity_checks = False
+        log.error(f"cmd_7zip: '{cmd_7zip}' is not pointing to a file")
+
+if not sanity_checks:
+    sys.exit(2)
 
 mode = None
 subset = None
@@ -312,7 +339,9 @@ while i < len(sys.argv):
             usage()
 
         xp12_root = sys.argv[i]
-        CFG['DEFAULTS']['xp12_root'] = xp12_root
+        if not os.path.isdir(xp12_root):
+            sanity_checks = False
+            log.error(f"'{xp12_root}' is not a valid directory")
 
     elif sys.argv[i] == "-rect":
         i = i + 1
@@ -377,20 +406,24 @@ while i < len(sys.argv):
 if mode is None:
     usage()
 
-xp12_root = CFG['DEFAULTS']['xp12_root']
-work_dir = CFG['DEFAULTS']['work_dir']
-ortho_dir = CFG['DEFAULTS']['ortho_dir']
-num_workers = int(CFG['DEFAULTS']['num_workers'])
-dsf_tool = CFG['TOOLS']['dsftool']
-cmd_7zip = CFG['TOOLS']['7zip']
+if not sanity_checks:
+    sys.exit(2)
+
 
 log.info(f"xp12_root: {xp12_root}")
 log.info(f"ortho_dir: {ortho_dir}")
+log.info(f"work_dir:  {work_dir}")
+log.info(f"dsf_tool:  {dsf_tool}")
+log.info(f"cmd_7zip:  {cmd_7zip}")
 
 dsf_list = DsfList(xp12_root, ortho_dir)
 
 if not os.path.isdir(work_dir):
     os.makedirs(work_dir)
+
+if not os.access(work_dir, os.W_OK):
+    log.error(f"work_dir: '{work_dir}' is not writeable")
+    sys.exit(2)
 
 dsf_list.scan(mode, limit, subset, rect)
 
