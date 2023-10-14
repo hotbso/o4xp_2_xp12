@@ -7,7 +7,7 @@ dir_re = zOrtho4XP_.*|z_autoortho.scenery.z_ao_[a-z]+|Orbx_.*_TE_Orthos|zVStates
 # The directory where X-Plane is installed
 xp12_root = E:\X-Plane-12
 # The directory where orthos are installed.
-Below is the default (= just below "Custom Scenery"). If you have your orthos elsewhere specify it here.
+# Below is the default (= just underneath "Custom Scenery"). If you have your orthos elsewhere specify it here.
 ortho_dir = %(xp12_root)s\Custom Scenery
 # A directory where temporary files will be stored
 work_dir = C:\work
@@ -16,8 +16,8 @@ work_dir = C:\work
 num_workers = 10
 [TOOLS]
 # These are some necessary tools for the conversion.
-Get dfstool here https://developer.x-plane.com/tools/xptools/
+# Get dfstool here https://developer.x-plane.com/tools/xptools/
 dsftool = E:\XPL-Tools\xptools_win_23-4\tools\DSFtool.exe
-# and point this to your 7-Zip utility
+# ... and point this to your 7-Zip utility
 # Linux users: Just specify 7zip=7z
 7zip = C:\Program Files\7-Zip\7z.exe
