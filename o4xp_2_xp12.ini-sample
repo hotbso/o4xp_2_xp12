@@ -1,10 +1,23 @@
 [DEFAULTS]
+# This is a regexp of names of directories that usually contain orthos.
+# If you have a different naming scheme you can add it here.
+# If you're not familiar with regexp better leave this alone.
+dir_re = zOrtho4XP_.*|z_autoortho.scenery.z_ao_[a-z]+|Orbx_.*_TE_Orthos|zVStates_.*
+#
+# The directory where X-Plane is installed
 xp12_root = E:\X-Plane-12
-# below is the default. If you have your orthos elsewhere specify it here
+# The directory where orthos are installed.
+Below is the default (= just below "Custom Scenery"). If you have your orthos elsewhere specify it here.
 ortho_dir = %(xp12_root)s\Custom Scenery
-work_dir = work
+# A directory where temporary files will be stored
+work_dir = C:\work
+# Number of workers that run in parallel. Number of cores - 1 or, in case of hyperthreading number of threads - 2
+# is a good starting point. Below is the value for Ryzen 5 7600X (6 cores, 12 threads)
 num_workers = 10
 [TOOLS]
+# These are some necessary tools for the conversion.
+Get dfstool here https://developer.x-plane.com/tools/xptools/
 dsftool = E:\XPL-Tools\xptools_win_23-4\tools\DSFtool.exe
+# and point this to your 7-Zip utility
 # Linux users: Just specify 7zip=7z
-7zip = c:\Program Files\7-Zip\7z.exe
+7zip = C:\Program Files\7-Zip\7z.exe

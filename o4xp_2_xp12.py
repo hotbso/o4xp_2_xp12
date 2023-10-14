@@ -1,4 +1,3 @@
-
 # MIT License
 
 # Copyright (c) 2023 Holger Teutsch
@@ -21,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.1"
+VERSION = "1.2"
 
 import platform, sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
@@ -138,11 +137,8 @@ class DsfList():
     M_UNDO = 2
     M_CLEANUP = 3
 
-    _o4xp_re = re.compile('zOrtho4XP_.*')
-    _ao_re = re.compile('z_autoortho.scenery.z_ao_[a-z]+')
-    _orbx_te_re = re.compile('Orbx_.*_TE_Orthos')
-
-    def __init__(self, xp12_root, ortho_dir):
+    def __init__(self, dir_re, xp12_root, ortho_dir):
+        self._dir_re = re.compile(dir_re)
         self.queue = Queue()
         self._threads = []
         self.xp12_root = xp12_root
@@ -156,8 +152,7 @@ class DsfList():
 
         try:    # until StopIteration
             for dir, dirs, files in os.walk(self.ortho_dir):
-                if not self._o4xp_re.search(dir) and not self._ao_re.search(dir) \
-                        and not self._orbx_te_re.search(dir):
+                if not self._dir_re.search(dir):
                     continue
 
                 for f in files:
@@ -297,34 +292,6 @@ def usage():
         """)
     sys.exit(2)
 
-xp12_root = CFG['DEFAULTS']['xp12_root']
-work_dir = CFG['DEFAULTS']['work_dir']
-ortho_dir = CFG['DEFAULTS']['ortho_dir']
-num_workers = int(CFG['DEFAULTS']['num_workers'])
-dsf_tool = CFG['TOOLS']['dsftool']
-cmd_7zip = CFG['TOOLS']['7zip']
-
-sanity_checks = True
-if not os.path.isdir(xp12_root):
-    sanity_checks = False
-    log.error(f"xp12_root: '{xp12_root}' is not a valid directory")
-
-if not os.path.isdir(ortho_dir):
-    sanity_checks = False
-    log.error(f"ortho_dir: '{ortho_dir}' is not a valid directory")
-
-if not os.path.isfile(dsf_tool):
-    sanity_checks = False
-    log.error(f"dsf_tool: '{dsf_tool}' is not pointing to a file")
-
-if platform.system() == 'Windows':
-    if not os.path.isfile(cmd_7zip):
-        sanity_checks = False
-        log.error(f"cmd_7zip: '{cmd_7zip}' is not pointing to a file")
-
-if not sanity_checks:
-    sys.exit(2)
-
 mode = None
 subset = None
 rect = None
@@ -339,9 +306,7 @@ while i < len(sys.argv):
             usage()
 
         xp12_root = sys.argv[i]
-        if not os.path.isdir(xp12_root):
-            sanity_checks = False
-            log.error(f"'{xp12_root}' is not a valid directory")
+        CFG['DEFAULTS']['xp12_root'] = xp12_root    # other values may be interpolated on xp12_root
 
     elif sys.argv[i] == "-rect":
         i = i + 1
@@ -406,17 +371,45 @@ while i < len(sys.argv):
 if mode is None:
     usage()
 
+# added in 1.2
+dir_re = CFG['DEFAULTS'].get('dir_re', "zOrtho4XP_.*|z_autoortho.scenery.z_ao_[a-z]+|Orbx_.*_TE_Orthos|zVStates_.*")
+
+xp12_root = CFG['DEFAULTS']['xp12_root']
+work_dir = CFG['DEFAULTS']['work_dir']
+ortho_dir = CFG['DEFAULTS']['ortho_dir']
+num_workers = int(CFG['DEFAULTS']['num_workers'])
+dsf_tool = CFG['TOOLS']['dsftool']
+cmd_7zip = CFG['TOOLS']['7zip']
+
+sanity_checks = True
+if not os.path.isdir(xp12_root):
+    sanity_checks = False
+    log.error(f"xp12_root: '{xp12_root}' is not a valid directory")
+
+if not os.path.isdir(ortho_dir):
+    sanity_checks = False
+    log.error(f"ortho_dir: '{ortho_dir}' is not a valid directory")
+
+if not os.path.isfile(dsf_tool):
+    sanity_checks = False
+    log.error(f"dsf_tool: '{dsf_tool}' is not pointing to a file")
+
+if platform.system() == 'Windows':
+    if not os.path.isfile(cmd_7zip):
+        sanity_checks = False
+        log.error(f"cmd_7zip: '{cmd_7zip}' is not pointing to a file")
+
 if not sanity_checks:
     sys.exit(2)
 
-
+log.info(f"dir_re:    {dir_re}")
 log.info(f"xp12_root: {xp12_root}")
 log.info(f"ortho_dir: {ortho_dir}")
 log.info(f"work_dir:  {work_dir}")
 log.info(f"dsf_tool:  {dsf_tool}")
 log.info(f"cmd_7zip:  {cmd_7zip}")
 
-dsf_list = DsfList(xp12_root, ortho_dir)
+dsf_list = DsfList(dir_re, xp12_root, ortho_dir)
 
 if not os.path.isdir(work_dir):
     os.makedirs(work_dir)
