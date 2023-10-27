@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.2"
+VERSION = "1.3"
 
 import platform, sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
@@ -36,7 +36,6 @@ class Dsf():
         self.fname_bck = self.fname + "-pre_o4xp_2_xp12"
         self.cnv_marker = self.fname + "-o4xp_2_xp12_done"
         self.dsf_base, _ = os.path.splitext(os.path.basename(self.fname))
-        self.rdata_fn = os.path.join(work_dir, self.dsf_base + ".rdata")
         self.rdata = []
         self.is_converted = os.path.isfile(self.cnv_marker)
         self.has_backup = os.path.isfile(self.fname_bck)
@@ -57,63 +56,78 @@ class Dsf():
         i = self.fname.find("/Earth nav data/")
         assert i > 0, "invalid filename"
 
-        # check for already extracted raster data
-        if os.path.isfile(self.rdata_fn):
-            self.rdata = open(self.rdata_fn, "r").readlines()
-        else:
+        tmp_files = []
+
+        try:
+            o4xp_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-o4xp")
+            tmp_files.append(o4xp_dsf_txt)
+            for n in [ "spr1", "sum1", "fal1", "win1", \
+                       "spr2", "sum2", "fal2", "win2", \
+                       "soundscape", "sea_level", "elevation" ]:
+                tmp_files.append(f"{o4xp_dsf_txt}.{n}.raw",)
+
+            if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{self.fname}" "{o4xp_dsf_txt}"'):
+                return False
+
+            # sanity checks
+            o4xp_dsf_txt_lines = open(o4xp_dsf_txt, "r").readlines()
+            if not any("PATCH_VERTEX" in l for l in o4xp_dsf_txt_lines):
+                log.warning(f"{self.fname} does not contain a mesh, skipped")
+                return False
+
+            if any("RASTER" in l for l in o4xp_dsf_txt_lines):
+                log.warning(f"{self.fname} contains RASTER data, skipped")
+                return False
+
+            # extract raster data from XP12
             # demo areas overlay global scenery
             xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Demo Areas" + self.fname[i:]
             if not os.path.isfile(xp12_dsf):
                 xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Global Scenery" + self.fname[i:]
 
             xp12_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-xp12")
+            tmp_files.append(xp12_dsf_txt)
+            for n in [ "spr1", "sum1", "fal1", "win1", \
+                       "spr2", "sum2", "fal2", "win2", \
+                       "soundscape", "sea_level", "elevation" ]:
+                tmp_files.append(f"{xp12_dsf_txt}.{n}.raw",)
+ 
             #print(xp12_dsf)
             #print(xp12_dsf_txt)
             if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{xp12_dsf}" "{xp12_dsf_txt}"'):
                 return False
 
-            with open(self.rdata_fn, "w") as frd:
-                with open(xp12_dsf_txt, "r") as dsft:
-                    for l in dsft.readlines():
-                        if l.find("RASTER_") == 0:
-                            self.rdata.append(l)
-                            #print(l.rstrip())
-                            frd.write(l)
+            with open(xp12_dsf_txt, "r") as dsft:
+                for l in dsft.readlines():
+                    if l.find("RASTER_") == 0:
+                        self.rdata.append(l)
 
-            os.remove(xp12_dsf_txt)
+            # append RASTER to o4xp file
+            with open(o4xp_dsf_txt, 'a') as f:
+                for l in self.rdata:
+                    if (l.find("spr") > 0 or l.find("sum") > 0 or l.find("win") > 0 # use a positive list
+                       or l.find("fal") > 0 or l.find("soundscape") > 0 or l.find("elevation") > 0):
+                        f.write(l)
 
+            # always create a backup
+            if not os.path.isfile(self.fname_bck):
+                shutil.copy2(self.fname, self.fname_bck)
 
-        o4xp_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-o4xp")
-        if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{self.fname}" "{o4xp_dsf_txt}"'):
-            return False
+            fname_new = self.fname + "-new"
+            fname_new_1 = fname_new + "-1"
+            tmp_files.append(fname_new_1)
+            if not self.run_cmd(f'"{dsf_tool}" -text2dsf "{o4xp_dsf_txt}" "{fname_new_1}"'):
+                return False
 
-        o4xp_dsf_txt_lines = open(o4xp_dsf_txt, "r").readlines()
-        if any("RASTER" in l for l in o4xp_dsf_txt_lines):
-            log.warning(f"{self.fname} contains RASTER data, skipped")
-            os.remove(o4xp_dsf_txt)
-            return False
+            if not self.run_cmd(f'"{cmd_7zip}" a -t7z -m0=lzma "{fname_new}" "{fname_new_1}"'):
+                return False
+        finally:
+            for f in tmp_files:
+                try:
+                    os.remove(f)
+                except:
+                    pass
 
-        with open(o4xp_dsf_txt, 'a') as f:
-            for l in self.rdata:
-                if (l.find("spr") > 0 or l.find("sum") > 0 or l.find("win") > 0 # use a positive list
-                   or l.find("fal") > 0 or l.find("soundscape") > 0 or l.find("elevation") > 0):
-                    f.write(l)
-
-        # always create a backup
-        if not os.path.isfile(self.fname_bck):
-            shutil.copy2(self.fname, self.fname_bck)
-
-        fname_new = self.fname + "-new"
-        fname_new_1 = fname_new + "-1"
-        if not self.run_cmd(f'"{dsf_tool}" -text2dsf "{o4xp_dsf_txt}" "{fname_new_1}"'):
-            return False
-
-        os.remove(o4xp_dsf_txt)
-
-        if not self.run_cmd(f'"{cmd_7zip}" a -t7z -m0=lzma "{fname_new}" "{fname_new_1}"'):
-            return False
-
-        os.remove(fname_new_1)
         os.remove(self.fname)
         os.rename(fname_new, self.fname)
         open(self.cnv_marker, "w")  # create the marker
