@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.3"
+VERSION = "1.4-b1"
 
 import platform, sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
@@ -45,6 +45,7 @@ class Dsf():
 
     def run_cmd(self, cmd):
         # "shell = True" is not needed on Windows, bombs on Lx
+        #log.info(cmd)
         out = subprocess.run(shlex.split(cmd), capture_output = True)
         if out.returncode != 0:
             log.error(f"Can't run {cmd}: {out}")
@@ -84,6 +85,11 @@ class Dsf():
             xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Demo Areas" + self.fname[i:]
             if not os.path.isfile(xp12_dsf):
                 xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Global Scenery" + self.fname[i:]
+
+            xp12_dsf = os.path.normpath(xp12_dsf)
+            if not os.path.isfile(xp12_dsf):
+                log.warning(f"{xp12_dsf} does not exist!")
+                return False
 
             xp12_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-xp12")
             tmp_files.append(xp12_dsf_txt)
