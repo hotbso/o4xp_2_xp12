@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.4-b1"
+VERSION = "1.4-b2"
 
 import platform, sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
@@ -97,7 +97,7 @@ class Dsf():
                        "spr2", "sum2", "fal2", "win2", \
                        "soundscape", "sea_level", "elevation" ]:
                 tmp_files.append(f"{xp12_dsf_txt}.{n}.raw",)
- 
+
             #print(xp12_dsf)
             #print(xp12_dsf_txt)
             if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{xp12_dsf}" "{xp12_dsf_txt}"'):
@@ -168,7 +168,7 @@ class DsfList():
         lat_lon_re = None
         if rect is not None:
             lat1, lon1, lat2, lon2 = rect
-            lat_lon_re = re.compile('([+-]\d\d)([+-]\d\d\d).dsf')
+            lat_lon_re = re.compile(r'([+-]\d\d)([+-]\d\d\d).dsf')
 
         try:    # until StopIteration
             for dir, dirs, files in os.walk(self.ortho_dir):
@@ -286,6 +286,10 @@ log.info(f"Version: {VERSION}")
 log.info(f"args: {sys.argv}")
 
 CFG = configparser.ConfigParser()
+if not os.path.isfile('o4xp_2_xp12.ini'):
+    log.error("ini file 'o4xp_2_xp12.ini' does not exist!")
+    sys.exit(1)
+
 CFG.read('o4xp_2_xp12.ini')
 dry_run = False
 
@@ -333,7 +337,7 @@ while i < len(sys.argv):
         if i >= len(sys.argv):
             usage()
 
-        m = re.match("([+-]\d\d)([+-]\d\d\d),([+-]\d\d)([+-]\d\d\d)", sys.argv[i])
+        m = re.match(r"([+-]\d\d)([+-]\d\d\d),([+-]\d\d)([+-]\d\d\d)", sys.argv[i])
         if m is None:
             usage()
 
