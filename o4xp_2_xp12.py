@@ -22,6 +22,7 @@
 
 VERSION = "1.4-b2"
 
+import tempfile
 import platform, sys, os, os.path, time, shlex, subprocess, shutil, re, threading
 from queue import Queue, Empty
 import configparser
@@ -29,10 +30,11 @@ import logging
 
 log = logging.getLogger("o4xp_2_xp12")
 
-class Dsf():
+
+class Dsf:
 
     def __init__(self, fname):
-        self.fname = fname.replace('\\', '/')
+        self.fname = fname.replace("\\", "/")
         self.fname_bck = self.fname + "-pre_o4xp_2_xp12"
         self.cnv_marker = self.fname + "-o4xp_2_xp12_done"
         self.dsf_base, _ = os.path.splitext(os.path.basename(self.fname))
@@ -45,8 +47,8 @@ class Dsf():
 
     def run_cmd(self, cmd):
         # "shell = True" is not needed on Windows, bombs on Lx
-        #log.info(cmd)
-        out = subprocess.run(shlex.split(cmd), capture_output = True)
+        # log.info(cmd)
+        out = subprocess.run(shlex.split(cmd), capture_output=True)
         if out.returncode != 0:
             log.error(f"Can't run {cmd}: {out}")
             return False
@@ -62,12 +64,26 @@ class Dsf():
         try:
             o4xp_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-o4xp")
             tmp_files.append(o4xp_dsf_txt)
-            for n in [ "spr1", "sum1", "fal1", "win1", \
-                       "spr2", "sum2", "fal2", "win2", \
-                       "soundscape", "sea_level", "elevation" ]:
-                tmp_files.append(f"{o4xp_dsf_txt}.{n}.raw",)
+            for n in [
+                "spr1",
+                "sum1",
+                "fal1",
+                "win1",
+                "spr2",
+                "sum2",
+                "fal2",
+                "win2",
+                "soundscape",
+                "sea_level",
+                "elevation",
+            ]:
+                tmp_files.append(
+                    f"{o4xp_dsf_txt}.{n}.raw",
+                )
 
-            if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{self.fname}" "{o4xp_dsf_txt}"'):
+            if not self.run_cmd(
+                f'"{dsf_tool}" -dsf2text "{self.fname}" "{o4xp_dsf_txt}"'
+            ):
                 return False
 
             # sanity checks
@@ -82,9 +98,15 @@ class Dsf():
 
             # extract raster data from XP12
             # demo areas overlay global scenery
-            xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Demo Areas" + self.fname[i:]
+            xp12_dsf = (
+                xp12_root + "/Global Scenery/X-Plane 12 Demo Areas" + self.fname[i:]
+            )
             if not os.path.isfile(xp12_dsf):
-                xp12_dsf = xp12_root + "/Global Scenery/X-Plane 12 Global Scenery" + self.fname[i:]
+                xp12_dsf = (
+                    xp12_root
+                    + "/Global Scenery/X-Plane 12 Global Scenery"
+                    + self.fname[i:]
+                )
 
             xp12_dsf = os.path.normpath(xp12_dsf)
             if not os.path.isfile(xp12_dsf):
@@ -93,14 +115,28 @@ class Dsf():
 
             xp12_dsf_txt = os.path.join(work_dir, self.dsf_base + ".txt-xp12")
             tmp_files.append(xp12_dsf_txt)
-            for n in [ "spr1", "sum1", "fal1", "win1", \
-                       "spr2", "sum2", "fal2", "win2", \
-                       "soundscape", "sea_level", "elevation" ]:
-                tmp_files.append(f"{xp12_dsf_txt}.{n}.raw",)
+            for n in [
+                "spr1",
+                "sum1",
+                "fal1",
+                "win1",
+                "spr2",
+                "sum2",
+                "fal2",
+                "win2",
+                "soundscape",
+                "sea_level",
+                "elevation",
+            ]:
+                tmp_files.append(
+                    f"{xp12_dsf_txt}.{n}.raw",
+                )
 
-            #print(xp12_dsf)
-            #print(xp12_dsf_txt)
-            if not self.run_cmd(f'"{dsf_tool}" -dsf2text "{xp12_dsf}" "{xp12_dsf_txt}"'):
+            # print(xp12_dsf)
+            # print(xp12_dsf_txt)
+            if not self.run_cmd(
+                f'"{dsf_tool}" -dsf2text "{xp12_dsf}" "{xp12_dsf_txt}"'
+            ):
                 return False
 
             with open(xp12_dsf_txt, "r") as dsft:
@@ -109,10 +145,16 @@ class Dsf():
                         self.rdata.append(l)
 
             # append RASTER to o4xp file
-            with open(o4xp_dsf_txt, 'a') as f:
+            with open(o4xp_dsf_txt, "a") as f:
                 for l in self.rdata:
-                    if (l.find("spr") > 0 or l.find("sum") > 0 or l.find("win") > 0 # use a positive list
-                       or l.find("fal") > 0 or l.find("soundscape") > 0 or l.find("elevation") > 0):
+                    if (
+                        l.find("spr") > 0
+                        or l.find("sum") > 0
+                        or l.find("win") > 0  # use a positive list
+                        or l.find("fal") > 0
+                        or l.find("soundscape") > 0
+                        or l.find("elevation") > 0
+                    ):
                         f.write(l)
 
             # always create a backup
@@ -122,10 +164,14 @@ class Dsf():
             fname_new = self.fname + "-new"
             fname_new_1 = fname_new + "-1"
             tmp_files.append(fname_new_1)
-            if not self.run_cmd(f'"{dsf_tool}" -text2dsf "{o4xp_dsf_txt}" "{fname_new_1}"'):
+            if not self.run_cmd(
+                f'"{dsf_tool}" -text2dsf "{o4xp_dsf_txt}" "{fname_new_1}"'
+            ):
                 return False
 
-            if not self.run_cmd(f'"{cmd_7zip}" a -t7z -m0=lzma "{fname_new}" "{fname_new_1}"'):
+            if not self.run_cmd(
+                f'"{cmd_7zip}" a -t7z -m0=lzma "{fname_new}" "{fname_new_1}"'
+            ):
                 return False
         finally:
             for f in tmp_files:
@@ -150,7 +196,8 @@ class Dsf():
     def cleanup(self):
         os.remove(self.fname_bck)
 
-class DsfList():
+
+class DsfList:
     # modes
     M_CONVERT = 0
     M_REDO = 1
@@ -168,19 +215,19 @@ class DsfList():
         lat_lon_re = None
         if rect is not None:
             lat1, lon1, lat2, lon2 = rect
-            lat_lon_re = re.compile(r'([+-]\d\d)([+-]\d\d\d).dsf')
+            lat_lon_re = re.compile(r"([+-]\d\d)([+-]\d\d\d).dsf")
 
-        try:    # until StopIteration
+        try:  # until StopIteration
             for dir, dirs, files in os.walk(self.ortho_dir):
                 if not self._dir_re.search(dir):
                     continue
 
                 for f in files:
                     if limit <= 0:
-                        raise StopIteration     # break out of all loops
+                        raise StopIteration  # break out of all loops
 
                     _, ext = os.path.splitext(f)
-                    if ext != '.dsf':
+                    if ext != ".dsf":
                         continue
 
                     full_name = os.path.join(dir, f)
@@ -189,12 +236,11 @@ class DsfList():
                             continue
 
                     if lat_lon_re is not None:
-                        m = lat_lon_re.match(f.replace('\\', '/'))
+                        m = lat_lon_re.match(f.replace("\\", "/"))
                         assert m is not None
                         lat = int(m.group(1))
                         lon = int(m.group(2))
-                        if (lat < lat1 or lon < lon1 or
-                            lat > lat2 or lon > lon2):
+                        if lat < lat1 or lon < lon1 or lat > lat2 or lon > lon2:
                             continue
 
                     dsf = Dsf(full_name)
@@ -230,9 +276,11 @@ class DsfList():
         log.info(f"Queued {self.queue.qsize()} files")
 
     def worker(self, i, mode):
-         while True:
+        while True:
             try:
-                dsf = self.queue.get(block = False, timeout = 5)    # timeout to make it interruptible
+                dsf = self.queue.get(
+                    block=False, timeout=5
+                )  # timeout to make it interruptible
             except Empty:
                 break
 
@@ -258,7 +306,7 @@ class DsfList():
         start_time = time.time()
 
         for i in range(num_workers):
-            t = threading.Thread(target=self.worker, args=(i, mode), daemon = True)
+            t = threading.Thread(target=self.worker, args=(i, mode), daemon=True)
             self._threads.append(t)
             t.start()
 
@@ -266,35 +314,57 @@ class DsfList():
             qlen = self.queue.qsize()
             if qlen == 0:
                 break
-            log.info(f"{qlen_start - qlen}/{qlen_start} = {100 * (1-qlen/qlen_start):0.1f}% processed")
+            log.info(
+                f"{qlen_start - qlen}/{qlen_start} = {100 * (1-qlen/qlen_start):0.1f}% processed"
+            )
             time.sleep(20)
 
         for t in self._threads:
             t.join()
 
         end_time = time.time()
-        log.info(f"Processed {qlen_start} tiles in {end_time - start_time:0.1f} seconds")
+        log.info(
+            f"Processed {qlen_start} tiles in {end_time - start_time:0.1f} seconds"
+        )
+
 
 ###########
 ## main
 ###########
-logging.basicConfig(level=logging.INFO,
-                    handlers=[logging.FileHandler(filename = "o4x_2_xp12.log", mode='w'),
-                              logging.StreamHandler()])
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[
+        logging.FileHandler(filename="o4x_2_xp12.log", mode="w"),
+        logging.StreamHandler(),
+    ],
+)
 
 log.info(f"Version: {VERSION}")
 log.info(f"args: {sys.argv}")
+isRunningInXplaneRoot = False
 
 CFG = configparser.ConfigParser()
-if not os.path.isfile('o4xp_2_xp12.ini'):
+if not os.path.isfile("o4xp_2_xp12.ini"):
     log.error("ini file 'o4xp_2_xp12.ini' does not exist!")
-    sys.exit(1)
+    # check if we are under xplane root
+    if os.path.isfile(
+        "Resources/default scenery/default apt dat/Earth nav data/apt.dat"
+    ):
+        log.warning("You are in an X-Plane root directory, but the ini file is missing")
+        log.warning(
+            "Please copy the ini file from the tools directory to this location"
+        )
+        isRunningInXplaneRoot = True
+    else:
+        sys.exit(1)
 
-CFG.read('o4xp_2_xp12.ini')
-dry_run = False
+if not isRunningInXplaneRoot:
+    CFG.read("o4xp_2_xp12.ini")
+    dry_run = False
+
 
 def usage():
-    log.error( \
+    log.error(
         """o4xp_2_xp12 [-rect lower_left,upper_right] [-subset string] [-limit n] [-dry_run] [-root xp12_root] convert|undo|cleanup
             -rect       restrict to rectangle, corners format is lat,lon, e.g. +50+009
             -subset     matching filenames must contain the string
@@ -313,8 +383,10 @@ def usage():
                 o4xp_2_xp12 -subset z_ao_eur -dry_run cleanup
                 o4xp_2_xp12 -root E:/XP12-test -subset z_ao_eur -limit 1000 convert
                 o4xp_2_xp12 -rect +36+019,+40+025 -cleanup
-        """)
+        """
+    )
     sys.exit(2)
+
 
 mode = None
 subset = None
@@ -330,7 +402,9 @@ while i < len(sys.argv):
             usage()
 
         xp12_root = sys.argv[i]
-        CFG['DEFAULTS']['xp12_root'] = xp12_root    # other values may be interpolated on xp12_root
+        CFG["DEFAULTS"][
+            "xp12_root"
+        ] = xp12_root  # other values may be interpolated on xp12_root
 
     elif sys.argv[i] == "-rect":
         i = i + 1
@@ -396,14 +470,26 @@ if mode is None:
     usage()
 
 # added in 1.2
-dir_re = CFG['DEFAULTS'].get('dir_re', "zOrtho4XP_.*|z_autoortho.scenery.z_ao_[a-z]+|Orbx_.*_TE_Orthos|zVStates_.*")
+dir_re = CFG["DEFAULTS"].get(
+    "dir_re",
+    "zOrtho4XP_.*|z_autoortho.scenery.z_ao_[a-z]+|Orbx_.*_TE_Orthos|zVStates_.*",
+)
 
-xp12_root = CFG['DEFAULTS']['xp12_root']
-work_dir = CFG['DEFAULTS']['work_dir']
-ortho_dir = CFG['DEFAULTS']['ortho_dir']
-num_workers = int(CFG['DEFAULTS']['num_workers'])
-dsf_tool = CFG['TOOLS']['dsftool']
-cmd_7zip = CFG['TOOLS']['7zip']
+# get xp12_root or default to current script location
+xp12_root = CFG["DEFAULTS"].get(
+    "xp12_root", os.path.dirname(os.path.realpath(__file__))
+)
+# get work_dir or default to system temp
+work_dir = CFG["DEFAULTS"].get("work_dir", tempfile.gettempdir())
+ortho_dir = CFG["DEFAULTS"]["ortho_dir"]
+# get num_workers or default to 10
+num_workers = int(CFG["DEFAULTS"].get("num_workers", 10))
+# get pyinstaller fs path
+if hasattr(sys, "_MEIPASS"):
+    MEIPASS_PATH = sys._MEIPASS
+# get dsf_tool or default to dsf_tool in pyinstaller bundle
+dsf_tool = CFG["TOOLS"].get("dsf_tool", os.path.join(MEIPASS_PATH, "dsf_tool"))
+cmd_7zip = CFG["TOOLS"].get("7zip", os.path.join(MEIPASS_PATH, "7z"))
 
 sanity_checks = True
 if not os.path.isdir(xp12_root):
@@ -418,7 +504,7 @@ if not os.path.isfile(dsf_tool):
     sanity_checks = False
     log.error(f"dsf_tool: '{dsf_tool}' is not pointing to a file")
 
-if platform.system() == 'Windows':
+if platform.system() == "Windows":
     if not os.path.isfile(cmd_7zip):
         sanity_checks = False
         log.error(f"cmd_7zip: '{cmd_7zip}' is not pointing to a file")
@@ -444,6 +530,6 @@ if not os.access(work_dir, os.W_OK):
 
 dsf_list.scan(mode, limit, subset, rect)
 
-#dsf_list.queue.put(Dsf("E:/X-Plane-12/Custom Scenery/z_autoortho/scenery/z_ao_eur/Earth nav data/+50+000/+51+009.dsf"))
+# dsf_list.queue.put(Dsf("E:/X-Plane-12/Custom Scenery/z_autoortho/scenery/z_ao_eur/Earth nav data/+50+000/+51+009.dsf"))
 if not dry_run:
     dsf_list.execute(num_workers, mode)

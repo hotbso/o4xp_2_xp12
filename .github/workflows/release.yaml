@@ -28,7 +28,37 @@ jobs:
           OS: ${{ matrix.os }}
         shell: bash
         run: |
-          python -m PyInstaller  --distpath o4xp_2_xp12/. --workpath ./OBJ --onefile o4xp_2_xp12.py
+          if [[ "$OS" = "windows-latest" ]]; then 
+              curl -L 'https://7-zip.org/a/7z2408-x64.exe' --output 7z;
+              curl https://files.x-plane.com/public/xptools/xptools_win_24-5.zip --output xptools.zip;
+              ./7z x xptools.zip;
+              mv tools/DSFTool.exe dsf_tool;
+          else
+            if [[ "$OS" = "ubuntu-latest" ]]; then
+              curl https://7-zip.org/a/7z2408-linux-x64.tar.xz --output 7z.tar.xz
+              tar -xf 7z.tar.xz
+              mv 7zz 7z
+              curl https://files.x-plane.com/public/xptools/xptools_lin_24-5.zip --output xptools.zip;
+              ./7z x xptools.zip;
+              mv tools/DSFTool dsf_tool;
+
+            else
+              curl  https://7-zip.org/a/7z2408-mac.tar.xz --output 7z.tar.xz
+              tar -xf 7z.tar.xz
+              mv 7zz 7z
+              curl https://files.x-plane.com/public/xptools/xptools_mac_24-5.zip --output xptools.zip;
+              ./7z x xptools.zip;
+              mv tools/DSFTool dsf_tool;
+              
+            fi
+          fi
+
+          ls
+          
+          python -m PyInstaller  --distpath o4xp_2_xp12/. --workpath ./OBJ --onefile o4xp_2_xp12.py \
+            --add-binary "dsf_tool:." \
+            --add-binary "7z:."
+          
           if [[ "$OS" = "windows-latest" ]]; then 
               mv o4xp_2_xp12/o4xp_2_xp12.exe o4xp_2_xp12.exe; 
           else
