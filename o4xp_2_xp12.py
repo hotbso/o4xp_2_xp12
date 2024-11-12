@@ -342,25 +342,38 @@ logging.basicConfig(
 log.info(f"Version: {VERSION}")
 log.info(f"args: {sys.argv}")
 isRunningInXplaneRoot = False
+CURRENT_DIR = os.getcwd()
 
 CFG = configparser.ConfigParser()
 if not os.path.isfile("o4xp_2_xp12.ini"):
-    log.error("ini file 'o4xp_2_xp12.ini' does not exist!")
-    # check if we are under xplane root
+    #  log current directory
+    log.info(f"Current directory: {CURRENT_DIR}")
     if os.path.isfile(
-        "Resources/default scenery/default apt dat/Earth nav data/apt.dat"
+        os.path.join(
+            CURRENT_DIR,
+            "Resources/default scenery/airport scenery/library.txt",
+        )
     ):
         log.warning("You are in an X-Plane root directory, but the ini file is missing")
-        log.warning(
-            "Please copy the ini file from the tools directory to this location"
-        )
+        # make some default settings
+        CFG["DEFAULTS"] = {
+            "xp12_root": CURRENT_DIR,
+            "ortho_dir": CURRENT_DIR + "/Custom Scenery",
+            "work_dir": tempfile.gettempdir(),
+            "num_workers": "10",
+        }
+        CFG["TOOLS"] = {}
+        # let's save the ini file
+        with open("o4xp_2_xp12.ini", "w") as configfile:
+            CFG.write(configfile)
+        log.info("Default ini file 'o4xp_2_xp12.ini' created in current directory")
         isRunningInXplaneRoot = True
     else:
+        log.error("ini file 'o4xp_2_xp12.ini' does not exist or not in X-Plane root")
         sys.exit(1)
 
-if not isRunningInXplaneRoot:
-    CFG.read("o4xp_2_xp12.ini")
-    dry_run = False
+CFG.read("o4xp_2_xp12.ini")
+dry_run = False
 
 
 def usage():
@@ -475,15 +488,10 @@ dir_re = CFG["DEFAULTS"].get(
     "zOrtho4XP_.*|z_autoortho.scenery.z_ao_[a-z]+|Orbx_.*_TE_Orthos|zVStates_.*",
 )
 
-# get xp12_root or default to current script location
-xp12_root = CFG["DEFAULTS"].get(
-    "xp12_root", os.path.dirname(os.path.realpath(__file__))
-)
-# get work_dir or default to system temp
-work_dir = CFG["DEFAULTS"].get("work_dir", tempfile.gettempdir())
+xp12_root = CFG["DEFAULTS"]["xp12_root"]
+work_dir = CFG["DEFAULTS"]["work_dir"]
 ortho_dir = CFG["DEFAULTS"]["ortho_dir"]
-# get num_workers or default to 10
-num_workers = int(CFG["DEFAULTS"].get("num_workers", 10))
+num_workers = int(CFG["DEFAULTS"]["num_workers"])
 # get pyinstaller fs path
 if hasattr(sys, "_MEIPASS"):
     MEIPASS_PATH = sys._MEIPASS
