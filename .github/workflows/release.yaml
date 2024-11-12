@@ -31,7 +31,7 @@ jobs:
           if [[ "$OS" = "windows-latest" ]]; then 
               curl -L 'https://7-zip.org/a/7z2408-x64.exe' --output 7z;
               curl https://files.x-plane.com/public/xptools/xptools_win_24-5.zip --output xptools.zip;
-              ./7z x xptools.zip;
+              unzip xptools.zip;
               mv tools/DSFTool.exe dsf_tool;
           else
             if [[ "$OS" = "ubuntu-latest" ]]; then
