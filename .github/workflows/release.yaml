@@ -28,7 +28,7 @@ jobs:
           OS: ${{ matrix.os }}
         shell: bash
         run: |
-          if [[ "$OS" = "windows-latest" ]]; then 
+          if [[ "$OS" = "windows-latest" ]]; then
               curl -L 'https://7-zip.org/a/7zr.exe' --output 7z;
               curl https://files.x-plane.com/public/xptools/xptools_win_24-5.zip --output xptools.zip;
               unzip xptools.zip;
@@ -49,18 +49,21 @@ jobs:
               curl https://files.x-plane.com/public/xptools/xptools_mac_24-5.zip --output xptools.zip;
               ./7z x xptools.zip;
               mv tools/DSFTool dsf_tool;
-              
+
             fi
           fi
 
           ls
-          
+
+          TAG="${{github.ref_name}}"
+          mv o4xp_2_xp12.py o4xp_2_xp12.py-
+          sed -e "s/--TAG--/$TAG/g" o4xp_2_xp12.py- > o4xp_2_xp12.py
           python -m PyInstaller  --distpath o4xp_2_xp12/. --workpath ./OBJ --onefile o4xp_2_xp12.py \
             --add-binary "dsf_tool:." \
             --add-binary "7z:."
-          
-          if [[ "$OS" = "windows-latest" ]]; then 
-              mv o4xp_2_xp12/o4xp_2_xp12.exe o4xp_2_xp12.exe; 
+
+          if [[ "$OS" = "windows-latest" ]]; then
+              mv o4xp_2_xp12/o4xp_2_xp12.exe o4xp_2_xp12.exe;
           else
               mv o4xp_2_xp12/o4xp_2_xp12 o4xp_2_xp12_$OS;
           fi

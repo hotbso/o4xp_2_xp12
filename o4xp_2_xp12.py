@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-VERSION = "1.4-b2"
+VERSION = "--TAG--"
 
 import tempfile
 import platform, sys, os, os.path, time, shlex, subprocess, shutil, re, threading
