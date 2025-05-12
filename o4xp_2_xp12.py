@@ -218,7 +218,7 @@ class DsfList:
             lat_lon_re = re.compile(r"([+-]\d\d)([+-]\d\d\d).dsf")
 
         try:  # until StopIteration
-            for dir, dirs, files in os.walk(self.ortho_dir):
+            for dir, dirs, files in os.walk(self.ortho_dir,followlinks=True):
                 if not self._dir_re.search(dir):
                     continue
 
